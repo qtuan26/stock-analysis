@@ -12,22 +12,22 @@ MỤC TIÊU CHÍNH
 
 
 HƯỚNG DẪN CÀI ĐẶT THƯ VIỆN TRONG requirements.txt:
-Bước 1 — Kiểm tra phiên bản Python
+- Bước 1 — Kiểm tra phiên bản Python
 Dự án này yêu cầu Python ≥ 3.9.
-Kiểm tra bằng lệnh:
+- Kiểm tra bằng lệnh:
 python --version
 
-Bước 2 - Tạo môi trường ảo (venv)
+- Bước 2 - Tạo môi trường ảo (venv)
 python -m venv venv
-Kích hoạt:
+- Kích hoạt:
 venv\Scripts\activate
 
-Bước 3 - Cài thư viện từ requirements.txt
-Trong trạng thái đang bật venv, chạy:
+- Bước 3 - Cài thư viện từ requirements.txt
+-Trong trạng thái đang bật venv, chạy:
 pip install -r requirements.txt
-Tuyệt đối không chạy pip install bên ngoài venv.
+- Tuyệt đối không chạy pip install bên ngoài venv.
 
-Bước 4 — Chạy code hoặc Jupyter Notebook:
+- Bước 4 — Chạy code hoặc Jupyter Notebook:
 ...
 
 
