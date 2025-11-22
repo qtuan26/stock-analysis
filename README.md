@@ -30,7 +30,7 @@ pip install -r requirements.txt
 - Bước 4 — Chạy code hoặc Jupyter Notebook:
 ...
 
-
+```text
 CẤU TRÚC PROJECT:
 stock-analysis-project/
 │
@@ -75,3 +75,4 @@ stock-analysis-project/
 ├── requirements.txt         # thư viện cần cài
 ├── README.md                # mô tả project
 └── .gitignore               # bỏ qua data thô, file nặng
+```
