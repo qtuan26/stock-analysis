@@ -1,0 +1,13 @@
+pandas
+numpy
+matplotlib
+seaborn
+yfinance
+plotly
+scikit-learn
+streamlit
+ta
+requests
+jupyter
+python-dateutil
+pillow
