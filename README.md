@@ -1,78 +1,83 @@
-GIỚI THIỆU:
-- Dự án này được thực hiện trong khuôn khổ môn học Python, với mục tiêu xây dựng một ứng dụng phân tích dữ liệu chứng khoán hoàn chỉnh, từ khâu thu thập dữ liệu, phân tích, xây dựng mô hình dự đoán đến hiển thị dashboard.
-- Dự án gồm 5 thành viên, mỗi người phụ trách một phần riêng biệt tương ứng với workflow của một quy trình Data Science.
-
-MỤC TIÊU CHÍNH
-- Thu thập dữ liệu chứng khoán từ API hoặc CSV.
-- Làm sạch, chuẩn hoá và lưu dữ liệu dưới dạng CSV.
-- Thực hiện EDA (phân tích dữ liệu khám phá).
-- Tính toán các chỉ báo kỹ thuật (MA, RSI, MACD…).
-- Xây dựng mô hình Machine Learning đơn giản dự đoán giá.
-- Tạo dashboard bằng Streamlit để trình diễn kết quả.
-
-
-HƯỚNG DẪN CÀI ĐẶT THƯ VIỆN TRONG requirements.txt:
-- Bước 1 — Kiểm tra phiên bản Python <br>
-Dự án này yêu cầu Python ≥ 3.9. <br>
-Kiểm tra bằng lệnh:<br>
-python --version
-
-- Bước 2 - Tạo môi trường ảo (venv) <br>
-python -m venv venv <br>
-Kích hoạt: <br>
-venv\Scripts\activate
-
-- Bước 3 - Cài thư viện từ requirements.txt <br>
-Trong trạng thái đang bật venv, chạy: <br>
-pip install -r requirements.txt <br>
-Tuyệt đối không chạy pip install bên ngoài venv.
-
-- Bước 4 — Chạy code hoặc Jupyter Notebook:
-...
-
-```text
-CẤU TRÚC PROJECT:
-stock-analysis-project/
-│
-├── venv            # môi trường ảo
-|
-├── data/
-│   ├── raw/                # dữ liệu thô từ API (Người 1)
-│   ├── processed/          # CSV sau cleaning (Người 1)
-│   └── external/           # dữ liệu tham khảo (tin tức, index,...)
-│
-├── notebooks/
-│   ├── 01_data_collection.ipynb     # Người 1
-│   ├── 02_eda_visualization.ipynb   # Người 2
-│   ├── 03_features_indicators.ipynb # Người 3
-│   ├── 04_ml_models.ipynb           # Người 4
-│   └── 05_dashboard_demo.ipynb      # Người 5
-│
+"""
+Cấu trúc dự án
+bai-cuoi-ky/
 ├── src/
-│   ├── data/               # Script Python xử lý dữ liệu
-│   │   ├── fetch_data.py
-│   │   ├── clean_data.py
-│   │   └── pipeline.py
-│   │
-│   ├── eda/                # Code trực quan hóa (Người 2)
-│   │   ├── plots.py
-│   │   └── statistics.py
-│   │
-│   ├── features/           # Indicators + feature engineering (Người 3)
-│   │   ├── indicators.py
-│   │   └── feature_engineering.py
-│   │
-│   ├── models/             # Machine Learning (Người 4)
-│   │   ├── train.py
-│   │   ├── evaluate.py
-│   │   └── predict.py
-│   │
-│   └── dashboard/          # Streamlit app (Người 5)
-│       ├── app.py
-│       └── components/
-│
-│
-├── requirements.txt         # thư viện cần cài
-├── README.md                # mô tả project
-└── .gitignore               # bỏ qua data thô, file nặng
-```
+│   └── data/
+│       ├── fetch.py       # Download dữ liệu raw từ Yahoo Finance
+│       ├── clean.py       # Làm sạch dữ liệu raw
+│       ├── features.py    # Tính các chỉ báo kỹ thuật
+│       └── pipeline.py    # Chạy toàn bộ pipeline
+├── data/
+│   ├── raw/               # CSV dữ liệu gốc
+│   └── processed/
+│       ├── clean/         # CSV dữ liệu đã clean
+│       └── features/      # CSV có các chỉ báo kỹ thuật
+├── requirements.txt
+└── README.md
+"""
+
+- Hướng dẫn cài đặt
+
+Clone repo: <br>
+
+git clone <repo-url> <br>
+cd abc... <br>
+
+
+- Tạo môi trường ảo:
+
+python -m venv venv <br>
+# Windows
+venv\Scripts\activate <br>
+
+
+
+- Cài thư viện: 
+
+pip install -r requirements.txt <br>
+
+- Cách chạy pipeline
+python src/data/pipeline.py <br>
+
+"""
+Pipeline thực hiện tuần tự 3 bước:
+
+Fetch
+
+Lấy dữ liệu cổ phiếu từ Yahoo Finance.
+
+Xử lý MultiIndex columns, thêm cột Ticker.
+
+Lưu CSV raw vào data/raw/.
+
+Clean
+
+Chuẩn hóa cột Date.
+
+Chọn các cột quan trọng: Open, High, Low, Close, Adj Close, Volume, Ticker.
+
+Drop các dòng thiếu dữ liệu ở cột quan trọng.
+
+Sort theo Ticker + Date.
+
+Lưu CSV clean vào data/processed/clean/.
+
+Features
+
+Tính các chỉ báo kỹ thuật: RSI(14), SMA(20), EMA(12), Bollinger Bands(20).
+
+Drop các dòng đầu bị NaN (do các chỉ báo cần “warm-up”).
+
+Lưu CSV features vào data/processed/features/.
+
+⚠️ Lưu ý: File features.csv sẽ mất khoảng 20 dòng đầu do tính toán các chỉ báo kỹ thuật, đây là hành vi bình thường.
+
+🔹 Thêm ticker mới
+
+Mở src/pipeline.py và sửa danh sách TICKERS:
+
+TICKERS = ["AAPL", "AMZN", "GOOG", "MSFT", "TSLA", "NVDA"]
+
+
+Chạy lại pipeline.
+"""
