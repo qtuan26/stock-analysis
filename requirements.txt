@@ -11,3 +11,7 @@ requests
 jupyter
 python-dateutil
 pillow
+notebook
+tensorflow 
+joblib
+xgboost
