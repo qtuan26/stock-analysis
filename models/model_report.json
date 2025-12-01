@@ -1,0 +1,30 @@
+{
+    "regression": {
+        "LinearReg": {
+            "rmse": 12.840951677516172
+        },
+        "RandomForestReg": {
+            "rmse": 14.525887272209934
+        },
+        "XGBoostReg": {
+            "rmse": 14.327519271422458
+        },
+        "LightGBMReg": {
+            "rmse": 14.352006434490892
+        }
+    },
+    "classification": {
+        "LogisticClf": {
+            "accuracy": 0.47776879547291834,
+            "precision": 0.4955116696588869,
+            "recall": 0.43057722308892354,
+            "f1": 0.4607679465776294
+        },
+        "RandomForestClf": {
+            "accuracy": 0.486661277283751,
+            "precision": 0.5039267015706806,
+            "recall": 0.6006240249609984,
+            "f1": 0.5480427046263345
+        }
+    }
+}

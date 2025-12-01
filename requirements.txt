@@ -15,3 +15,5 @@ notebook
 tensorflow 
 joblib
 xgboost
+lightgbm
+ipywidgets
