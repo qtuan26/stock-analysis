@@ -1,4 +1,4 @@
-```
+
 1. PERFORMANCE METRICS QUA CÁC FOLDS 📈
 pythonmetrics = ['acc', 'f1', 'auc']
 Giải thích:
@@ -280,5 +280,6 @@ Worst performers: Tránh hoặc cần feature engineering riêng
 
 
 🎯 TÓM TẮT MỤC ĐÍCH TỪNG PHẦN
-VisualizationMục đíchQuyết địnhMetrics across foldsKiểm tra stabilityModel có robust không?ROC/PR curvesĐánh giá classificationAUC đủ tốt để trade?Confusion matricesChọn thresholdBalance precision/recallFeature importanceHiểu modelFeatures nào quan trọng?SHAPExplainabilityTại sao model dự đoán vậy?BacktestingEconomic valueStrategy có lãi thực tế không?Prediction distributionModel qualityPredictions có reliable không?Per-symbolGranular analysisCổ phiếu nào dễ/khó dự đoán?
+
+![alt text](image.png)
 ```
