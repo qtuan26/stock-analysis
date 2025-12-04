@@ -137,45 +137,45 @@ def create_features_pipeline(input_file='price_train.csv',
                              output_file='features_engineered.csv'):
     """Pipeline tạo features hoàn chỉnh"""
     
-    print("📥 Loading data...")
+    print("Loading data...")
     df = pd.read_csv(input_file)
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values(['symbol', 'date'])
     
-    print("📊 Adding Moving Averages...")
+    print("Adding Moving Averages...")
     df = add_moving_averages(df)
     
-    print("📈 Adding RSI...")
+    print("Adding RSI...")
     df = add_rsi(df)
     
-    print("📉 Adding MACD...")
+    print("Adding MACD...")
     df = add_macd(df)
     
-    print("🎯 Adding Bollinger Bands...")
+    print("Adding Bollinger Bands...")
     df = add_bollinger_bands(df)
     
-    print("⚡ Adding Stochastic...")
+    print("Adding Stochastic...")
     df = add_stochastic(df)
     
-    print("🎲 Adding ADX...")
+    print("Adding ADX...")
     df = add_adx(df)
     
-    print("🔧 Adding Advanced Features...")
+    print("Adding Advanced Features...")
     df = add_advanced_features(df)
     
-    print("🏷️ Creating Labels...")
+    print("Creating Labels...")
     df = create_labels(df)
     
     # Loại bỏ NaN
-    print("🧹 Cleaning data...")
+    print("Cleaning data...")
     df = df.dropna()
     
     # Lưu file
-    print(f"💾 Saving to {output_file}...")
+    print(f"Saving to {output_file}...")
     df.to_csv(output_file, index=False)
     
-    print(f"✅ Done! Created {len(df.columns)} features for {df['symbol'].nunique()} symbols")
-    print(f"📊 Features: {df.columns.tolist()}")
+    print(f"Done! Created {len(df.columns)} features for {df['symbol'].nunique()} symbols")
+    print(f"Features: {df.columns.tolist()}")
     
     return df
 
