@@ -68,25 +68,50 @@ df_features = load_features(stock)
 if df is None or df.empty:
     st.error("❌ Không tìm thấy dữ liệu cổ phiếu")
     st.stop()
-min_date = df["Date"].min().date()
-max_date = df["Date"].max().date()
+# min_date = df["Date"].min().date()
+# max_date = df["Date"].max().date()
 
-start_date, end_date = st.sidebar.date_input(
-    "📅 Chọn khoảng thời gian",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date
+# startDate, endDate = st.sidebar.date_input(
+#     "📅 Chọn khoảng thời gian",
+#     value=(min_date, max_date),
+#     min_value=min_date,
+#     max_value=max_date
+# )
+
+option = st.sidebar.radio(
+    "⏱️ Chọn nhanh khoảng thời gian",
+    ["1 Tháng", "3 Tháng", "6 Tháng", "1 Năm", "Toàn bộ"]
 )
 
-# Lọc dữ liệu theo ngày
-df = df[(df["Date"].dt.date >= start_date) & (df["Date"].dt.date <= end_date)]
+
+latestDate = df["Date"].max()        # pandas.Timestamp
+earliestDate = df["Date"].min()
+
+if option == "1 Tháng":
+    startDate = latestDate - pd.DateOffset(months=1)
+elif option == "3 Tháng":
+    startDate = latestDate - pd.DateOffset(months=3)
+elif option == "6 Tháng":
+    startDate = latestDate - pd.DateOffset(months=6)
+elif option == "1 Năm":
+    startDate = latestDate - pd.DateOffset(years=1)
+else:
+    startDate = earliestDate
+
+# Định nghĩa ngày bắt đầu và kết thúc dựa trên timestamp đã chọn
+endDate = latestDate
+
+# Chuyển đổi timestamp sang date để sử dụng trong bộ lọc ngày
+df = df[(df["Date"] >= startDate) & (df["Date"] <= endDate)]
 
 if df.empty:
     st.warning("⚠️ Không có dữ liệu trong khoảng ngày đã chọn.")
     st.stop()
 
+# cập nhật latest / prev sau khi lọc
 latest = df.iloc[-1]
 prev = df.iloc[-2]
+
 
 
 
