@@ -15,8 +15,7 @@ from sklearn.metrics import (
     confusion_matrix, classification_report, roc_curve, auc, average_precision_score
 )
 from sklearn.model_selection import ParameterGrid
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
 import lightgbm as lgb
 import xgboost as xgb
@@ -87,8 +86,6 @@ ensure_dirs(OUT_DIRS)
 MODEL_PATH_LGB = os.path.join("models", "lgb_model.txt")
 MODEL_PATH_XGB = os.path.join("models", "xgb_model.json")
 MODEL_PATH_RF = os.path.join("models", "rf_model.pkl")
-MODEL_PATH_GB = os.path.join("models", "gb_model.pkl")
-MODEL_PATH_LR = os.path.join("models", "lr_model.pkl")
 SCALER_PATH = os.path.join("models", "scaler.pkl")
 RESULTS_CSV = os.path.join("results", "ml_results_summary.csv")
 
@@ -174,28 +171,9 @@ rf_params = {
     "class_weight": "balanced",
 }
 
-gb_params = {
-    "n_estimators": 100,
-    "learning_rate": 0.05,
-    "max_depth": 5,
-    "min_samples_split": 10,
-    "min_samples_leaf": 5,
-    "subsample": 0.8,
-    "random_state": 42,
-}
-
-lr_params = {
-    "max_iter": 1000,
-    "random_state": 42,
-    "n_jobs": -1,
-    "class_weight": "balanced",
-}
-
 oof_preds_lgb = np.zeros(len(df))
 oof_preds_xgb = np.zeros(len(df))
 oof_preds_rf = np.zeros(len(df))
-oof_preds_gb = np.zeros(len(df))
-oof_preds_lr = np.zeros(len(df))
 fold_metrics = []
 
 for fold, (train_idx, val_idx) in enumerate(splits, 1):
@@ -268,20 +246,7 @@ for fold, (train_idx, val_idx) in enumerate(splits, 1):
     y_val_proba_rf = rf_model.predict_proba(X_val_s)[:, 1]
     oof_preds_rf[val_idx] = y_val_proba_rf
     
-    # Gradient Boosting
-    print("Training Gradient Boosting...")
-    gb_model = GradientBoostingClassifier(**gb_params)
-    gb_model.fit(X_train_s, y_train)
-    y_val_proba_gb = gb_model.predict_proba(X_val_s)[:, 1]
-    oof_preds_gb[val_idx] = y_val_proba_gb
-    
-    # Logistic Regression
-    print("Training Logistic Regression...")
-    lr_model = LogisticRegression(**lr_params)
-    lr_model.fit(X_train_s, y_train)
-    y_val_proba_lr = lr_model.predict_proba(X_val_s)[:, 1]
-    oof_preds_lr[val_idx] = y_val_proba_lr
-    
+
     # Evaluate fold
     def classify_stats(y_true, y_proba, thr=0.5):
         y_pred = (y_proba >= thr).astype(int)
@@ -296,13 +261,9 @@ for fold, (train_idx, val_idx) in enumerate(splits, 1):
     stats_lgb = classify_stats(y_val, y_val_proba_lgb)
     stats_xgb = classify_stats(y_val, y_val_proba_xgb)
     stats_rf = classify_stats(y_val, y_val_proba_rf)
-    stats_gb = classify_stats(y_val, y_val_proba_gb)
-    stats_lr = classify_stats(y_val, y_val_proba_lr)
     print("LGB Fold metrics:", stats_lgb)
     print("XGB Fold metrics:", stats_xgb)
     print("RF Fold metrics:", stats_rf)
-    print("GB Fold metrics:", stats_gb)
-    print("LR Fold metrics:", stats_lr)
     
     fold_metrics.append({
         "fold": fold,
@@ -315,20 +276,12 @@ for fold, (train_idx, val_idx) in enumerate(splits, 1):
         "rf_acc": stats_rf["acc"],
         "rf_f1": stats_rf["f1"],
         "rf_auc": stats_rf["auc"],
-        "gb_acc": stats_gb["acc"],
-        "gb_f1": stats_gb["f1"],
-        "gb_auc": stats_gb["auc"],
-        "lr_acc": stats_lr["acc"],
-        "lr_f1": stats_lr["f1"],
-        "lr_auc": stats_lr["auc"],
     })
     
     # Save last fold models to disk (will overwrite as we go; final saved will be last fold trainer)
     lgb_model.save_model(MODEL_PATH_LGB)
     xgb_model.save_model(MODEL_PATH_XGB)
     joblib.dump(rf_model, MODEL_PATH_RF)
-    joblib.dump(gb_model, MODEL_PATH_GB)
-    joblib.dump(lr_model, MODEL_PATH_LR)
 
 # ----------------------------
 # Final evaluation on OOF (out-of-fold)
@@ -360,8 +313,6 @@ print("\n=== OOF Evaluation ===")
 res_lgb = evaluate_oof(y_all, oof_preds_lgb)
 res_xgb = evaluate_oof(y_all, oof_preds_xgb)
 res_rf = evaluate_oof(y_all, oof_preds_rf)
-res_gb = evaluate_oof(y_all, oof_preds_gb)
-res_lr = evaluate_oof(y_all, oof_preds_lr)
 
 print("\nLightGBM OOF: AUC=%.4f AP=%.4f best_thr=%.3f best_f1=%.4f" %
       (res_lgb["auc"], res_lgb["average_precision"], res_lgb["best_threshold"], res_lgb["best_f1"]))
@@ -378,15 +329,6 @@ print("\nRandom Forest OOF: AUC=%.4f AP=%.4f best_thr=%.3f best_f1=%.4f" %
 print(res_rf["classification_report"])
 print("Confusion matrix:\n", res_rf["confusion_matrix"])
 
-print("\nGradient Boosting OOF: AUC=%.4f AP=%.4f best_thr=%.3f best_f1=%.4f" %
-      (res_gb["auc"], res_gb["average_precision"], res_gb["best_threshold"], res_gb["best_f1"]))
-print(res_gb["classification_report"])
-print("Confusion matrix:\n", res_gb["confusion_matrix"])
-
-print("\nLogistic Regression OOF: AUC=%.4f AP=%.4f best_thr=%.3f best_f1=%.4f" %
-      (res_lr["auc"], res_lr["average_precision"], res_lr["best_threshold"], res_lr["best_f1"]))
-print(res_lr["classification_report"])
-print("Confusion matrix:\n", res_lr["confusion_matrix"])
 
 # Save OOF fold metrics
 pd.DataFrame(fold_metrics).to_csv(os.path.join("results", "fold_metrics.csv"), index=False)
@@ -398,20 +340,14 @@ df_eval = df.copy()
 df_eval["lgb_proba"] = oof_preds_lgb
 df_eval["xgb_proba"] = oof_preds_xgb
 df_eval["rf_proba"] = oof_preds_rf
-df_eval["gb_proba"] = oof_preds_gb
-df_eval["lr_proba"] = oof_preds_lr
 
 thr_lgb = res_lgb["best_threshold"]
 thr_xgb = res_xgb["best_threshold"]
 thr_rf = res_rf["best_threshold"]
-thr_gb = res_gb["best_threshold"]
-thr_lr = res_lr["best_threshold"]
 
 df_eval["lgb_signal"] = (df_eval["lgb_proba"] >= thr_lgb).astype(int)
 df_eval["xgb_signal"] = (df_eval["xgb_proba"] >= thr_xgb).astype(int)
 df_eval["rf_signal"] = (df_eval["rf_proba"] >= thr_rf).astype(int)
-df_eval["gb_signal"] = (df_eval["gb_proba"] >= thr_gb).astype(int)
-df_eval["lr_signal"] = (df_eval["lr_proba"] >= thr_lr).astype(int)
 
 df_eval["next_ret"] = df_eval["target_return"] / 100.0  # convert to decimal
 TRANSACTION_COST = 0.0005  # 5 bps per trade (adjustable)
@@ -429,32 +365,20 @@ df_eval["rf_pos"] = df_eval.groupby("symbol")["rf_signal"].shift(0).fillna(0)
 df_eval["rf_pos_prev"] = df_eval.groupby("symbol")["rf_pos"].shift(1).fillna(0)
 df_eval["rf_trade"] = (df_eval["rf_pos"] != df_eval["rf_pos_prev"]).astype(int)
 
-df_eval["gb_pos"] = df_eval.groupby("symbol")["gb_signal"].shift(0).fillna(0)
-df_eval["gb_pos_prev"] = df_eval.groupby("symbol")["gb_pos"].shift(1).fillna(0)
-df_eval["gb_trade"] = (df_eval["gb_pos"] != df_eval["gb_pos_prev"]).astype(int)
-
-df_eval["lr_pos"] = df_eval.groupby("symbol")["lr_signal"].shift(0).fillna(0)
-df_eval["lr_pos_prev"] = df_eval.groupby("symbol")["lr_pos"].shift(1).fillna(0)
-df_eval["lr_trade"] = (df_eval["lr_pos"] != df_eval["lr_pos_prev"]).astype(int)
-
 df_eval["lgb_strategy_ret"] = df_eval["lgb_pos"] * df_eval["next_ret"] - df_eval["lgb_trade"] * TRANSACTION_COST
 df_eval["xgb_strategy_ret"] = df_eval["xgb_pos"] * df_eval["next_ret"] - df_eval["xgb_trade"] * TRANSACTION_COST
 df_eval["rf_strategy_ret"] = df_eval["rf_pos"] * df_eval["next_ret"] - df_eval["rf_trade"] * TRANSACTION_COST
-df_eval["gb_strategy_ret"] = df_eval["gb_pos"] * df_eval["next_ret"] - df_eval["gb_trade"] * TRANSACTION_COST
-df_eval["lr_strategy_ret"] = df_eval["lr_pos"] * df_eval["next_ret"] - df_eval["lr_trade"] * TRANSACTION_COST
 
 daily = df_eval.groupby("date").agg(
     lgb_strat_ret = ("lgb_strategy_ret", "mean"),
     xgb_strat_ret = ("xgb_strategy_ret", "mean"),
     rf_strat_ret = ("rf_strategy_ret", "mean"),
-    gb_strat_ret = ("gb_strategy_ret", "mean"),
-    lr_strat_ret = ("lr_strategy_ret", "mean"),
 ).sort_index()
 
-for name in ["lgb_strat_ret", "xgb_strat_ret", "rf_strat_ret", "gb_strat_ret", "lr_strat_ret"]:
+for name in ["lgb_strat_ret", "xgb_strat_ret", "rf_strat_ret"]:
     daily[f"{name}_cum"] = (1 + daily[name].fillna(0)).cumprod()
 
-for model_prefix in ["lgb", "xgb", "rf", "gb", "lr"]:
+for model_prefix in ["lgb", "xgb", "rf"]:
     strat = daily[f"{model_prefix}_strat_ret"].fillna(0)
     cum = daily[f"{model_prefix}_strat_ret_cum"]
     ann_sharpe = annualized_sharpe(strat)
@@ -548,14 +472,6 @@ summary = {
     "rf_oof_ap": res_rf["average_precision"],
     "rf_best_thr": res_rf["best_threshold"],
     "rf_best_f1": res_rf["best_f1"],
-    "gb_oof_auc": res_gb["auc"],
-    "gb_oof_ap": res_gb["average_precision"],
-    "gb_best_thr": res_gb["best_threshold"],
-    "gb_best_f1": res_gb["best_f1"],
-    "lr_oof_auc": res_lr["auc"],
-    "lr_oof_ap": res_lr["average_precision"],
-    "lr_best_thr": res_lr["best_threshold"],
-    "lr_best_f1": res_lr["best_f1"],
 }
 pd.DataFrame([summary]).to_csv(RESULTS_CSV, index=False)
 
