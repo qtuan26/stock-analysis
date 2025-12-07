@@ -2,12 +2,11 @@ pandas
 numpy
 matplotlib
 seaborn
-yfinance
-plotly
 scikit-learn
-streamlit
 ta
-requests
-jupyter
-python-dateutil
-pillow
+joblib
+lightgbm
+xgboost
+shap
+
+# pandas numpy matplotlib seaborn scikit-learn ta joblib xgboost lightgbm shap
