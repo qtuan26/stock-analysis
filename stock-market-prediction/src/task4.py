@@ -11,10 +11,9 @@ import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score,
-    confusion_matrix, classification_report, roc_curve, auc, average_precision_score
+    confusion_matrix, classification_report, roc_curve, auc, average_precision_score,
+    mean_absolute_error, mean_squared_error, r2_score
 )
-from sklearn.model_selection import ParameterGrid
-from sklearn.ensemble import RandomForestClassifier
 
 import lightgbm as lgb
 import xgboost as xgb
@@ -84,7 +83,8 @@ ensure_dirs(OUT_DIRS)
 
 MODEL_PATH_LGB = os.path.join("..", "models", "lgb_model.txt")
 MODEL_PATH_XGB = os.path.join("..", "models", "xgb_model.json")
-MODEL_PATH_RF = os.path.join("..", "models", "rf_model.pkl")
+MODEL_PATH_LGB_REG = os.path.join("..", "models", "lgb_reg.txt")
+MODEL_PATH_XGB_REG = os.path.join("..", "models", "xgb_reg.json")
 SCALER_PATH = os.path.join("..", "models", "scaler.pkl")
 RESULTS_CSV = os.path.join("..", "results", "ml_results_summary.csv")
 
@@ -95,6 +95,7 @@ exclude_cols = {"date", "symbol", "label_up_down", "target_return"}
 feature_cols = [c for c in df.columns if c not in exclude_cols]
 X_all = df[feature_cols].copy()
 y_all = df["label_up_down"].astype(int).copy()
+y_reg_all = df["target_return"].copy()
 
 # ----------------------------
 # Walk-forward split function
@@ -160,19 +161,34 @@ xgb_params = {
     "colsample_bytree": 0.8,
 }
 
-rf_params = {
-    "n_estimators": 100,
-    "max_depth": 10,
-    "min_samples_split": 10,
-    "min_samples_leaf": 5,
-    "random_state": 42,
+# Regression params
+lgb_reg_params = {
+    "objective": "regression",
+    "metric": "rmse",
+    "boosting_type": "gbdt",
+    "verbosity": -1,
+    "seed": 42,
     "n_jobs": -1,
-    "class_weight": "balanced",
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "max_depth": -1,
+    "min_data_in_leaf": 20,
+}
+
+xgb_reg_params = {
+    "objective": "reg:squarederror",
+    "eval_metric": "rmse",
+    "seed": 42,
+    "eta": 0.05,
+    "max_depth": 6,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
 }
 
 oof_preds_lgb = np.zeros(len(df))
 oof_preds_xgb = np.zeros(len(df))
-oof_preds_rf = np.zeros(len(df))
+oof_preds_lgb_reg = np.zeros(len(df))
+oof_preds_xgb_reg = np.zeros(len(df))
 fold_metrics = []
 
 for fold, (train_idx, val_idx) in enumerate(splits, 1):
@@ -181,6 +197,8 @@ for fold, (train_idx, val_idx) in enumerate(splits, 1):
     X_val   = X_all.iloc[val_idx].copy()
     y_train = y_all.iloc[train_idx].copy()
     y_val   = y_all.iloc[val_idx].copy()
+    y_reg_train = y_reg_all.iloc[train_idx].copy()
+    y_reg_val   = y_reg_all.iloc[val_idx].copy()
     
     # Scale features (fit on train only)
     scaler = StandardScaler()
@@ -238,13 +256,41 @@ for fold, (train_idx, val_idx) in enumerate(splits, 1):
     y_val_proba_xgb = safe_xgb_predict(xgb_model, xgb_dval)
     oof_preds_xgb[val_idx] = y_val_proba_xgb
     
-    # Random Forest
-    print("Training Random Forest...")
-    rf_model = RandomForestClassifier(**rf_params)
-    rf_model.fit(X_train_s, y_train)
-    y_val_proba_rf = rf_model.predict_proba(X_val_s)[:, 1]
-    oof_preds_rf[val_idx] = y_val_proba_rf
-    
+    # Regression: LightGBM
+    print("Training LightGBM Regressor...")
+    lgb_reg_train = lgb.Dataset(X_train_s, label=y_reg_train)
+    lgb_reg_val = lgb.Dataset(X_val_s, label=y_reg_val, reference=lgb_reg_train)
+    lgb_reg_model = lgb.train(
+        lgb_reg_params,
+        lgb_reg_train,
+        num_boost_round=2000,
+        valid_sets=[lgb_reg_train, lgb_reg_val],
+        callbacks=[
+            lgb.early_stopping(stopping_rounds=100),
+            lgb.log_evaluation(-1)
+        ],
+    )
+    if hasattr(lgb_reg_model, "best_iteration") and lgb_reg_model.best_iteration is not None:
+        y_val_pred_lgb_reg = lgb_reg_model.predict(X_val_s, num_iteration=lgb_reg_model.best_iteration)
+    else:
+        y_val_pred_lgb_reg = lgb_reg_model.predict(X_val_s)
+    oof_preds_lgb_reg[val_idx] = y_val_pred_lgb_reg
+
+    # Regression: XGBoost
+    xgb_reg_dtrain = xgb.DMatrix(X_train_s, label=y_reg_train)
+    xgb_reg_dval = xgb.DMatrix(X_val_s, label=y_reg_val)
+    xgb_reg_watch = [(xgb_reg_dtrain, "train"), (xgb_reg_dval, "eval")]
+    print("Training XGBoost Regressor...")
+    xgb_reg_model = xgb.train(
+        params=xgb_reg_params,
+        dtrain=xgb_reg_dtrain,
+        num_boost_round=1000,
+        evals=xgb_reg_watch,
+        early_stopping_rounds=100,
+        verbose_eval=False
+    )
+    y_val_pred_xgb_reg = safe_xgb_predict(xgb_reg_model, xgb_reg_dval)
+    oof_preds_xgb_reg[val_idx] = y_val_pred_xgb_reg
 
     # Evaluate fold
     def classify_stats(y_true, y_proba, thr=0.5):
@@ -256,13 +302,22 @@ for fold, (train_idx, val_idx) in enumerate(splits, 1):
             "f1": f1_score(y_true, y_pred, zero_division=0),
             "auc": roc_auc_score(y_true, y_proba)
         }
+    def reg_stats(y_true, y_pred):
+        mse = mean_squared_error(y_true, y_pred)
+        return {
+            "mae": mean_absolute_error(y_true, y_pred),
+            "rmse": np.sqrt(mse),  # Manual calculation of RMSE 
+            "r2": r2_score(y_true, y_pred)
+        }
     
     stats_lgb = classify_stats(y_val, y_val_proba_lgb)
     stats_xgb = classify_stats(y_val, y_val_proba_xgb)
-    stats_rf = classify_stats(y_val, y_val_proba_rf)
+    stats_lgb_reg = reg_stats(y_reg_val, y_val_pred_lgb_reg)
+    stats_xgb_reg = reg_stats(y_reg_val, y_val_pred_xgb_reg)
     print("LGB Fold metrics:", stats_lgb)
     print("XGB Fold metrics:", stats_xgb)
-    print("RF Fold metrics:", stats_rf)
+    print("LGB-Reg Fold metrics:", stats_lgb_reg)
+    print("XGB-Reg Fold metrics:", stats_xgb_reg)
     
     fold_metrics.append({
         "fold": fold,
@@ -272,15 +327,19 @@ for fold, (train_idx, val_idx) in enumerate(splits, 1):
         "xgb_acc": stats_xgb["acc"],
         "xgb_f1": stats_xgb["f1"],
         "xgb_auc": stats_xgb["auc"],
-        "rf_acc": stats_rf["acc"],
-        "rf_f1": stats_rf["f1"],
-        "rf_auc": stats_rf["auc"],
+        "lgb_reg_mae": stats_lgb_reg["mae"],
+        "lgb_reg_rmse": stats_lgb_reg["rmse"],
+        "lgb_reg_r2": stats_lgb_reg["r2"],
+        "xgb_reg_mae": stats_xgb_reg["mae"],
+        "xgb_reg_rmse": stats_xgb_reg["rmse"],
+        "xgb_reg_r2": stats_xgb_reg["r2"],
     })
     
     # Save last fold models to disk (will overwrite as we go; final saved will be last fold trainer)
     lgb_model.save_model(MODEL_PATH_LGB)
     xgb_model.save_model(MODEL_PATH_XGB)
-    joblib.dump(rf_model, MODEL_PATH_RF)
+    lgb_reg_model.save_model(MODEL_PATH_LGB_REG)
+    xgb_reg_model.save_model(MODEL_PATH_XGB_REG)
 
 # ----------------------------
 # Final evaluation on OOF (out-of-fold)
@@ -311,8 +370,15 @@ def evaluate_oof(y_true, proba):
 print("\n=== OOF Evaluation ===")
 res_lgb = evaluate_oof(y_all, oof_preds_lgb)
 res_xgb = evaluate_oof(y_all, oof_preds_xgb)
-res_rf = evaluate_oof(y_all, oof_preds_rf)
-
+def evaluate_reg_oof(y_true, pred):
+    mse = mean_squared_error(y_true, pred)
+    return {
+        "mae": mean_absolute_error(y_true, pred),
+        "rmse": np.sqrt(mse),  # Manual calculation of RMSE
+        "r2": r2_score(y_true, pred)
+    }
+res_lgb_reg = evaluate_reg_oof(y_reg_all, oof_preds_lgb_reg)
+res_xgb_reg = evaluate_reg_oof(y_reg_all, oof_preds_xgb_reg)
 print("\nLightGBM OOF: AUC=%.4f AP=%.4f best_thr=%.3f best_f1=%.4f" %
       (res_lgb["auc"], res_lgb["average_precision"], res_lgb["best_threshold"], res_lgb["best_f1"]))
 print(res_lgb["classification_report"])
@@ -323,10 +389,10 @@ print("\nXGBoost OOF: AUC=%.4f AP=%.4f best_thr=%.3f best_f1=%.4f" %
 print(res_xgb["classification_report"])
 print("Confusion matrix:\n", res_xgb["confusion_matrix"])
 
-print("\nRandom Forest OOF: AUC=%.4f AP=%.4f best_thr=%.3f best_f1=%.4f" %
-      (res_rf["auc"], res_rf["average_precision"], res_rf["best_threshold"], res_rf["best_f1"]))
-print(res_rf["classification_report"])
-print("Confusion matrix:\n", res_rf["confusion_matrix"])
+print("\nLightGBM Regression OOF: MAE=%.4f RMSE=%.4f R2=%.4f" %
+      (res_lgb_reg["mae"], res_lgb_reg["rmse"], res_lgb_reg["r2"]))
+print("\nXGBoost Regression OOF: MAE=%.4f RMSE=%.4f R2=%.4f" %
+      (res_xgb_reg["mae"], res_xgb_reg["rmse"], res_xgb_reg["r2"]))
 
 
 # Save OOF fold metrics
@@ -338,15 +404,12 @@ pd.DataFrame(fold_metrics).to_csv(os.path.join("..", "results", "fold_metrics.cs
 df_eval = df.copy()
 df_eval["lgb_proba"] = oof_preds_lgb
 df_eval["xgb_proba"] = oof_preds_xgb
-df_eval["rf_proba"] = oof_preds_rf
 
 thr_lgb = res_lgb["best_threshold"]
 thr_xgb = res_xgb["best_threshold"]
-thr_rf = res_rf["best_threshold"]
 
 df_eval["lgb_signal"] = (df_eval["lgb_proba"] >= thr_lgb).astype(int)
 df_eval["xgb_signal"] = (df_eval["xgb_proba"] >= thr_xgb).astype(int)
-df_eval["rf_signal"] = (df_eval["rf_proba"] >= thr_rf).astype(int)
 
 df_eval["next_ret"] = df_eval["target_return"] / 100.0  # convert to decimal
 TRANSACTION_COST = 0.0005  # 5 bps per trade (adjustable)
@@ -360,24 +423,18 @@ df_eval["xgb_pos"] = df_eval.groupby("symbol")["xgb_signal"].shift(0).fillna(0)
 df_eval["xgb_pos_prev"] = df_eval.groupby("symbol")["xgb_pos"].shift(1).fillna(0)
 df_eval["xgb_trade"] = (df_eval["xgb_pos"] != df_eval["xgb_pos_prev"]).astype(int)
 
-df_eval["rf_pos"] = df_eval.groupby("symbol")["rf_signal"].shift(0).fillna(0)
-df_eval["rf_pos_prev"] = df_eval.groupby("symbol")["rf_pos"].shift(1).fillna(0)
-df_eval["rf_trade"] = (df_eval["rf_pos"] != df_eval["rf_pos_prev"]).astype(int)
-
 df_eval["lgb_strategy_ret"] = df_eval["lgb_pos"] * df_eval["next_ret"] - df_eval["lgb_trade"] * TRANSACTION_COST
 df_eval["xgb_strategy_ret"] = df_eval["xgb_pos"] * df_eval["next_ret"] - df_eval["xgb_trade"] * TRANSACTION_COST
-df_eval["rf_strategy_ret"] = df_eval["rf_pos"] * df_eval["next_ret"] - df_eval["rf_trade"] * TRANSACTION_COST
 
 daily = df_eval.groupby("date").agg(
     lgb_strat_ret = ("lgb_strategy_ret", "mean"),
-    xgb_strat_ret = ("xgb_strategy_ret", "mean"),
-    rf_strat_ret = ("rf_strategy_ret", "mean"),
+    xgb_strat_ret = ("xgb_strategy_ret", "mean")
 ).sort_index()
 
-for name in ["lgb_strat_ret", "xgb_strat_ret", "rf_strat_ret"]:
+for name in ["lgb_strat_ret", "xgb_strat_ret"]:
     daily[f"{name}_cum"] = (1 + daily[name].fillna(0)).cumprod()
 
-for model_prefix in ["lgb", "xgb", "rf"]:
+for model_prefix in ["lgb", "xgb"]:
     strat = daily[f"{model_prefix}_strat_ret"].fillna(0)
     cum = daily[f"{model_prefix}_strat_ret_cum"]
     ann_sharpe = annualized_sharpe(strat)
@@ -467,10 +524,12 @@ summary = {
     "xgb_oof_ap": res_xgb["average_precision"],
     "xgb_best_thr": res_xgb["best_threshold"],
     "xgb_best_f1": res_xgb["best_f1"],
-    "rf_oof_auc": res_rf["auc"],
-    "rf_oof_ap": res_rf["average_precision"],
-    "rf_best_thr": res_rf["best_threshold"],
-    "rf_best_f1": res_rf["best_f1"],
+    "lgb_reg_mae": res_lgb_reg["mae"],
+    "lgb_reg_rmse": res_lgb_reg["rmse"],
+    "lgb_reg_r2": res_lgb_reg["r2"],
+    "xgb_reg_mae": res_xgb_reg["mae"],
+    "xgb_reg_rmse": res_xgb_reg["rmse"],
+    "xgb_reg_r2": res_xgb_reg["r2"],
 }
 pd.DataFrame([summary]).to_csv(RESULTS_CSV, index=False)
 
