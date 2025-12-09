@@ -4,7 +4,7 @@ import ta  # thư viện technical analysis
 from sklearn.preprocessing import StandardScaler
 
 # Load dữ liệu gốc
-df = pd.read_csv('price_train.csv')
+df = pd.read_csv('../data/price_train.csv')
 df['date'] = pd.to_datetime(df['date'])
 df = df.sort_values(['symbol', 'date'])
 def add_moving_averages(df):
@@ -133,8 +133,8 @@ def create_labels(df, forecast_horizon=1):
         )
     
     return df
-def create_features_pipeline(input_file='price_train.csv', 
-                             output_file='features_engineered.csv'):
+def create_features_pipeline(input_file='../data/price_train.csv', 
+                             output_file='../data/features_engineered.csv'):
     """Pipeline tạo features hoàn chỉnh"""
     
     print("Loading data...")

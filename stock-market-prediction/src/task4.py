@@ -67,7 +67,7 @@ def safe_xgb_predict(booster, dmatrix):
 # ----------------------------
 # Load features
 # ----------------------------
-DATA_FILE = "results/features_engineered.csv" if os.path.exists("results/features_engineered.csv") else "features_engineered.csv"
+DATA_FILE = "../data/features_engineered.csv" if os.path.exists("../data/features_engineered.csv") else ("../results/features_engineered.csv" if os.path.exists("../results/features_engineered.csv") else "features_engineered.csv")
 assert os.path.exists(DATA_FILE), f"{DATA_FILE} not found. Run Task 3 first."
 
 df = pd.read_csv(DATA_FILE, parse_dates=["date"])
@@ -79,14 +79,14 @@ df = df.dropna(subset=["label_up_down", "target_return"])
 # ----------------------------
 # Config & outputs
 # ----------------------------
-OUT_DIRS = ["models", "plots", "results"]
+OUT_DIRS = ["../models", "../plots", "../results"]
 ensure_dirs(OUT_DIRS)
 
-MODEL_PATH_LGB = os.path.join("models", "lgb_model.txt")
-MODEL_PATH_XGB = os.path.join("models", "xgb_model.json")
-MODEL_PATH_RF = os.path.join("models", "rf_model.pkl")
-SCALER_PATH = os.path.join("models", "scaler.pkl")
-RESULTS_CSV = os.path.join("results", "ml_results_summary.csv")
+MODEL_PATH_LGB = os.path.join("..", "models", "lgb_model.txt")
+MODEL_PATH_XGB = os.path.join("..", "models", "xgb_model.json")
+MODEL_PATH_RF = os.path.join("..", "models", "rf_model.pkl")
+SCALER_PATH = os.path.join("..", "models", "scaler.pkl")
+RESULTS_CSV = os.path.join("..", "results", "ml_results_summary.csv")
 
 # ----------------------------
 # Feature matrix
@@ -330,7 +330,7 @@ print("Confusion matrix:\n", res_rf["confusion_matrix"])
 
 
 # Save OOF fold metrics
-pd.DataFrame(fold_metrics).to_csv(os.path.join("results", "fold_metrics.csv"), index=False)
+pd.DataFrame(fold_metrics).to_csv(os.path.join("..", "results", "fold_metrics.csv"), index=False)
 
 # ----------------------------
 # Economic evaluation / backtest (simple)
@@ -397,7 +397,7 @@ plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
 plt.title("ROC - LightGBM (OOF)")
 plt.legend()
-save_fig(fig, os.path.join("plots", "roc_lgb_oof.png"))
+save_fig(fig, os.path.join("..", "plots", "roc_lgb_oof.png"))
 
 best_thr = res_lgb["best_threshold"]
 y_pred_best = (oof_preds_lgb >= best_thr).astype(int)
@@ -407,7 +407,7 @@ sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
 plt.title(f"LGB Confusion Matrix (thr={best_thr:.2f})")
 plt.xlabel("Predicted")
 plt.ylabel("Actual")
-save_fig(fig, os.path.join("plots", "confusion_lgb.png"))
+save_fig(fig, os.path.join("..", "plots", "confusion_lgb.png"))
 
 # Feature importance (LGB)
 lgb_final = lgb.Booster(model_file=MODEL_PATH_LGB)
@@ -415,14 +415,14 @@ imp = pd.DataFrame({
     "feature": feature_cols,
     "importance": lgb_final.feature_importance(importance_type="gain")
 }).sort_values("importance", ascending=False)
-imp.to_csv(os.path.join("results", "lgb_feature_importance.csv"), index=False)
+imp.to_csv(os.path.join("..", "results", "lgb_feature_importance.csv"), index=False)
 
 fig = plt.figure(figsize=(8,10))
 topn = imp.head(30)
 plt.barh(topn["feature"][::-1], topn["importance"][::-1])
 plt.xlabel("Gain importance")
 plt.title("Top feature importance - LightGBM")
-save_fig(fig, os.path.join("plots", "lgb_feature_importance.png"))
+save_fig(fig, os.path.join("..", "plots", "lgb_feature_importance.png"))
 
 # ----------------------------
 # SHAP explainability (sample) - compute on SCALED data and use feature names
@@ -444,20 +444,20 @@ shap_values = sv[1] if isinstance(sv, list) else sv
 fig = plt.figure(figsize=(8,6))
 # shap.summary_plot accepts numpy array + feature_names
 shap.summary_plot(shap_values, X_sample_s, feature_names=X_sample.columns.tolist(), show=False)
-save_fig(fig, os.path.join("plots", "shap_summary.png"))
+save_fig(fig, os.path.join("..", "plots", "shap_summary.png"))
 
 # SHAP bar plot - average impact of each feature
 fig = plt.figure(figsize=(10,6))
 shap.summary_plot(shap_values, X_sample_s, plot_type="bar", feature_names=X_sample.columns.tolist(), show=False)
-save_fig(fig, os.path.join("plots", "shap_bar_importance.png"))
+save_fig(fig, os.path.join("..", "plots", "shap_bar_importance.png"))
 
 # SHAP force plot - explain a single prediction
 fig = plt.figure(figsize=(12,3))
 shap.force_plot(explainer.expected_value, shap_values[0:1], X_sample_s[0:1], feature_names=X_sample.columns.tolist(), matplotlib=True, show=False)
-save_fig(fig, os.path.join("plots", "shap_force_example.png"))
+save_fig(fig, os.path.join("..", "plots", "shap_force_example.png"))
 
 # Save final artifacts
-joblib.dump(lgb_final, os.path.join("models", "lgb_final.pkl"))
+joblib.dump(lgb_final, os.path.join("..", "models", "lgb_final.pkl"))
 summary = {
     "lgb_oof_auc": res_lgb["auc"],
     "lgb_oof_ap": res_lgb["average_precision"],
@@ -474,6 +474,6 @@ summary = {
 }
 pd.DataFrame([summary]).to_csv(RESULTS_CSV, index=False)
 
-daily.to_csv(os.path.join("results", "daily_backtest.csv"))
+daily.to_csv(os.path.join("..", "results", "daily_backtest.csv"))
 
 print("\n✅ Task 4 completed. Artifacts saved in folders: models/, plots/, results/")
